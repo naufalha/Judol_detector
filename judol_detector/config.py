@@ -31,13 +31,13 @@ class Config:
     DEEPSEEK_MODEL: str = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
 
     # Scan
-    SCAN_INTERVAL: int = int(os.getenv("SCAN_INTERVAL", "60"))
-    BATCH_SIZE: int = int(os.getenv("BATCH_SIZE", "100"))
-    QUERY_LIMIT: int = int(os.getenv("QUERY_LIMIT", "1000"))
+    SCAN_INTERVAL: int = int(os.getenv("SCAN_INTERVAL", "60").strip())
+    BATCH_SIZE: int = int(os.getenv("BATCH_SIZE", "100").strip())
+    QUERY_LIMIT: int = int(os.getenv("QUERY_LIMIT", "1000").strip())
 
     # Behavior
-    AUTO_BLOCK: bool = os.getenv("AUTO_BLOCK", "false").lower() == "true"
-    LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
+    AUTO_BLOCK: bool = os.getenv("AUTO_BLOCK", "false").strip().lower() == "true"
+    LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO").strip()
     DB_PATH: str = os.getenv("DB_PATH", str(_PROJECT_ROOT / "data" / "judol_history.db"))
     REPORTS_DIR: str = os.getenv("REPORTS_DIR", str(_PROJECT_ROOT / "reports"))
 
