@@ -38,7 +38,8 @@ class PiholeBlocker:
 
             if data.get("session", {}).get("valid"):
                 self.sid = data["session"].get("sid", "")
-                self.session.cookies.set("sid", self.sid)
+                # Set SID sebagai custom HTTP header untuk request berikutnya (menghindari CSRF check)
+                self.session.headers.update({"sid": self.sid})
                 logger.debug("Blocker: authenticated to Pi-hole")
                 return True
             return False

@@ -41,8 +41,8 @@ class PiholeCollector:
 
             if data.get("session", {}).get("valid"):
                 self.sid = data["session"].get("sid", "")
-                # Set SID sebagai cookie/header untuk request berikutnya
-                self.session.cookies.set("sid", self.sid)
+                # Set SID sebagai custom HTTP header untuk request berikutnya (menghindari CSRF check)
+                self.session.headers.update({"sid": self.sid})
                 logger.info("Berhasil login ke Pi-hole")
                 return True
             else:
