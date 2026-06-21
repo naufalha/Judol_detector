@@ -61,6 +61,74 @@ sudo systemctl status judol-detector
 sudo journalctl -u judol-detector -f
 ```
 
+## 🐳 Deploy dengan Docker
+
+### Opsi A: Pi-hole + Judol Detector (Fresh Install)
+
+Gunakan jika **belum punya** Pi-hole Docker:
+
+```bash
+# 1. Clone repo
+git clone <repo-url> ~/judol_detector && cd ~/judol_detector
+
+# 2. Konfigurasi
+cp .env.example .env
+nano .env   # isi PIHOLE_PASSWORD dan DEEPSEEK_API_KEY
+
+# 3. Build & jalankan
+docker compose up -d
+
+# 4. Cek log
+docker compose logs -f judol-detector
+```
+
+`docker-compose.yml` akan menjalankan **Pi-hole v6** dan **Judol Detector** dalam satu network. `PIHOLE_URL` otomatis di-set ke `http://pihole`.
+
+### Opsi B: Tambah ke Pi-hole Docker yang Sudah Ada
+
+Gunakan jika **sudah punya** Pi-hole berjalan di Docker:
+
+```bash
+# 1. Konfigurasi
+cp .env.example .env
+nano .env
+
+# 2. Cari nama network Docker Pi-hole Anda
+docker network ls
+# contoh output: pihole_default
+
+# 3. Edit docker-compose.existing.yml
+nano docker-compose.existing.yml
+# - Uncomment bagian networks
+# - Ganti "pihole_network" dengan nama network Pi-hole Anda
+# - Set PIHOLE_URL=http://NAMA_CONTAINER_PIHOLE di .env
+
+# 4. Build & jalankan
+docker compose -f docker-compose.existing.yml up -d
+```
+
+### Docker CLI Commands
+
+```bash
+# Scan sekali (tanpa daemon)
+docker compose exec judol-detector python -m judol_detector scan --dry-run
+
+# Lihat statistik
+docker compose exec judol-detector python -m judol_detector stats
+
+# List domain judol
+docker compose exec judol-detector python -m judol_detector list
+
+# Generate report
+docker compose exec judol-detector python -m judol_detector report
+
+# Lihat log realtime
+docker compose logs -f judol-detector
+
+# Restart
+docker compose restart judol-detector
+```
+
 ## Perintah CLI
 
 | Perintah | Deskripsi |

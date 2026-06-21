@@ -1,0 +1,46 @@
+# ============================================
+# Judol Detector ONLY (untuk yang sudah punya Pi-hole Docker)
+# ============================================
+# Gunakan file ini jika Pi-hole SUDAH berjalan di Docker.
+#
+# Cara pakai:
+#   1. cp .env.example .env && nano .env
+#   2. Sesuaikan PIHOLE_URL dan network_mode di bawah
+#   3. docker compose -f docker-compose.existing.yml up -d
+# ============================================
+
+services:
+  judol-detector:
+    container_name: judol-detector
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./reports:/app/reports
+      - ./logs:/app/logs
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.50"
+
+    # === PILIH SALAH SATU OPSI DI BAWAH ===
+
+    # OPSI 1: Pi-hole di network Docker yang sama
+    # Uncomment 2 baris ini, ganti "pihole_network" dengan nama network Pi-hole Anda
+    # networks:
+    #   - pihole_network
+    # Dan set di .env: PIHOLE_URL=http://pihole (nama container Pi-hole)
+
+    # OPSI 2: Pi-hole di host network / IP statis
+    # Set di .env: PIHOLE_URL=http://192.168.1.1 (IP Raspberry Pi)
+    network_mode: host
+
+# Uncomment jika pakai OPSI 1:
+# networks:
+#   pihole_network:
+#     external: true
