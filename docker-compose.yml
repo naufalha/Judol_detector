@@ -19,6 +19,7 @@ services:
     environment:
       TZ: "Asia/Jakarta"
       FTLCONF_webserver_api_password: ${PIHOLE_PASSWORD}
+      FTLCONF_webserver_api_max_sessions: 64
     volumes:
       - pihole_config:/etc/pihole
       - pihole_dnsmasq:/etc/dnsmasq.d
