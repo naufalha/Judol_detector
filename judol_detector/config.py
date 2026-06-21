@@ -12,8 +12,10 @@ _ENV_PATH = _PROJECT_ROOT / ".env"
 if _ENV_PATH.exists():
     load_dotenv(_ENV_PATH)
 else:
-    print(f"[WARNING] File .env tidak ditemukan di {_ENV_PATH}")
-    print(f"          Salin .env.example ke .env dan isi konfigurasinya.")
+    # Hanya cetak peringatan jika environment variable penting belum diset (misal di Docker)
+    if not os.getenv("PIHOLE_PASSWORD") or not os.getenv("DEEPSEEK_API_KEY"):
+        print(f"[WARNING] File .env tidak ditemukan di {_ENV_PATH}")
+        print(f"          Salin .env.example ke .env dan isi konfigurasinya.")
 
 
 class Config:

@@ -59,7 +59,7 @@ class PiholeCollector:
             logger.error(f"Error saat autentikasi Pi-hole: {e}")
             return False
 
-    def fetch_queries(self, limit: int = 1000) -> list[dict]:
+    def fetch_queries(self, limit: int = 1000, since_timestamp: Optional[float] = None) -> list[dict]:
         """Ambil DNS query terbaru dari Pi-hole.
         
         Returns:
@@ -71,6 +71,9 @@ class PiholeCollector:
 
         try:
             params = {"length": limit}
+            if since_timestamp is not None:
+                params["from"] = int(since_timestamp)
+
             resp = self.session.get(
                 self._api_url("/queries"),
                 params=params,
@@ -126,20 +129,20 @@ class PiholeCollector:
         
         return list(domains)
 
-    def collect(self, limit: int = 1000) -> list[str]:
+    def collect(self, limit: int = 1000, since_timestamp: Optional[float] = None) -> tuple[list[str], list[dict]]:
         """Main method: kumpulkan unique domains dari Pi-hole.
         
         Returns:
-            List of unique domain strings
+            Tuple of (list of unique domain strings, raw queries list)
         """
-        queries = self.fetch_queries(limit=limit)
+        queries = self.fetch_queries(limit=limit, since_timestamp=since_timestamp)
         if not queries:
             logger.info("Tidak ada query baru dari Pi-hole")
-            return []
+            return [], []
         
         domains = self.extract_unique_domains(queries)
         logger.info(f"Ditemukan {len(domains)} domain unik dari {len(queries)} queries")
-        return domains
+        return domains, queries
 
     def close(self):
         """Tutup session."""

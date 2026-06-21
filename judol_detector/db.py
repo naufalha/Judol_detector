@@ -78,6 +78,11 @@ class Database:
                     blocked INTEGER DEFAULT 0
                 );
 
+                CREATE TABLE IF NOT EXISTS settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT
+                );
+
                 -- Index untuk query performa
                 CREATE INDEX IF NOT EXISTS idx_analyzed_domain
                     ON analyzed_domains(domain);
@@ -90,6 +95,25 @@ class Database:
                 CREATE INDEX IF NOT EXISTS idx_scan_timestamp
                     ON scan_history(timestamp);
             """)
+
+    # ---- Settings / Metadata ----
+
+    def get_setting(self, key: str, default: str = None) -> Optional[str]:
+        """Ambil value setting dari database."""
+        with self._connection() as conn:
+            row = conn.execute(
+                "SELECT value FROM settings WHERE key = ?",
+                (key,)
+            ).fetchone()
+            return row["value"] if row else default
+
+    def set_setting(self, key: str, value: str):
+        """Simpan/update value setting di database."""
+        with self._connection() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+                (key, str(value))
+            )
 
     # ---- Analyzed Domains ----
 

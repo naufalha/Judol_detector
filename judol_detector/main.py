@@ -37,11 +37,11 @@ def _signal_handler(signum, frame):
     _running = False
 
 
-def run_scan(db: Database, dry_run: bool = False) -> dict:
+def run_scan(db: Database, collector: PiholeCollector, dry_run: bool = False) -> dict:
     """Jalankan satu siklus scan.
     
     Flow:
-    1. Collect DNS queries dari Pi-hole
+    1. Collect DNS queries dari Pi-hole (incremental menggunakan timestamp jika ada)
     2. Filter domain yang sudah dianalisis (efisiensi)
     3. Kirim domain baru ke DeepSeek untuk analisis
     4. Simpan hasil ke database
@@ -61,21 +61,54 @@ def run_scan(db: Database, dry_run: bool = False) -> dict:
 
     # Step 1: Collect dari Pi-hole
     logger.info("[1/5] Mengumpulkan DNS queries dari Pi-hole...")
-    collector = PiholeCollector(
-        base_url=Config.PIHOLE_URL,
-        password=Config.PIHOLE_PASSWORD
-    )
     
+    # Ambil last query timestamp dari db
+    last_query_ts_str = db.get_setting("last_query_timestamp")
+    since_timestamp = None
+    if last_query_ts_str:
+        try:
+            since_timestamp = float(last_query_ts_str)
+        except ValueError:
+            pass
+
     try:
-        all_domains = collector.collect(limit=Config.QUERY_LIMIT)
-    finally:
-        collector.close()
+        all_domains, queries = collector.collect(limit=Config.QUERY_LIMIT, since_timestamp=since_timestamp)
+    except Exception as e:
+        logger.error(f"Gagal mengambil queries dari Pi-hole: {e}")
+        return result
+
+    result["total_queries"] = len(queries)
+
+    if not queries:
+        logger.info("Tidak ada query baru dari Pi-hole")
+        # Simpan scan result dengan 0 queries
+        db.save_scan_result(**result)
+        return result
+
+    # Cari max timestamp dari queries dan simpan ke DB
+    max_ts = since_timestamp
+    for q in queries:
+        ts = None
+        if isinstance(q, dict):
+            ts = q.get("timestamp") or q.get("time")
+        elif isinstance(q, (list, tuple)) and len(q) > 0:
+            ts = q[0]
+        
+        if ts is not None:
+            try:
+                ts_float = float(ts)
+                if max_ts is None or ts_float > max_ts:
+                    max_ts = ts_float
+            except (ValueError, TypeError):
+                pass
+    
+    if max_ts is not None and (since_timestamp is None or max_ts > since_timestamp):
+        db.set_setting("last_query_timestamp", str(max_ts))
 
     if not all_domains:
         logger.info("Tidak ada domain untuk diproses")
+        db.save_scan_result(**result)
         return result
-
-    result["total_queries"] = Config.QUERY_LIMIT  # approximate
     
     # Filter whitelist
     domains_filtered = [
@@ -165,25 +198,34 @@ def run_daemon(db: Database):
     logger.info(f"Auto-block: {'AKTIF' if Config.AUTO_BLOCK else 'NONAKTIF'}")
     logger.info("Tekan Ctrl+C untuk menghentikan")
 
-    scan_count = 0
-    while _running:
-        scan_count += 1
-        logger.info(f"\n{'='*50}")
-        logger.info(f"Scan #{scan_count} dimulai - {datetime.now().strftime('%H:%M:%S')}")
-        logger.info(f"{'='*50}")
-        
-        try:
-            run_scan(db)
-        except Exception as e:
-            logger.error(f"Error saat scan: {e}", exc_info=True)
+    # Persistent collector untuk efisiensi session dan koneksi
+    collector = PiholeCollector(
+        base_url=Config.PIHOLE_URL,
+        password=Config.PIHOLE_PASSWORD
+    )
 
-        if _running:
-            logger.info(f"Scan berikutnya dalam {interval} detik...")
-            # Sleep dalam interval kecil untuk responsive shutdown
-            for _ in range(interval):
-                if not _running:
-                    break
-                time.sleep(1)
+    scan_count = 0
+    try:
+        while _running:
+            scan_count += 1
+            logger.info(f"\n{'='*50}")
+            logger.info(f"Scan #{scan_count} dimulai - {datetime.now().strftime('%H:%M:%S')}")
+            logger.info(f"{'='*50}")
+            
+            try:
+                run_scan(db, collector)
+            except Exception as e:
+                logger.error(f"Error saat scan: {e}", exc_info=True)
+
+            if _running:
+                logger.info(f"Scan berikutnya dalam {interval} detik...")
+                # Sleep dalam interval kecil untuk responsive shutdown
+                for _ in range(interval):
+                    if not _running:
+                        break
+                    time.sleep(1)
+    finally:
+        collector.close()
 
     logger.info("Daemon dihentikan.")
 
@@ -303,7 +345,14 @@ Contoh penggunaan:
 
     # Execute command
     if args.command == "scan":
-        run_scan(db, dry_run=args.dry_run)
+        collector = PiholeCollector(
+            base_url=Config.PIHOLE_URL,
+            password=Config.PIHOLE_PASSWORD
+        )
+        try:
+            run_scan(db, collector, dry_run=args.dry_run)
+        finally:
+            collector.close()
     
     elif args.command == "daemon":
         run_daemon(db)
