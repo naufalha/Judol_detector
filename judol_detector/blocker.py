@@ -65,6 +65,7 @@ class PiholeBlocker:
             True jika berhasil
         """
         if not self._ensure_auth():
+            logger.error(f"Gagal memblokir {domain}: Autentikasi ke Pi-hole gagal")
             return False
 
         try:
@@ -74,68 +75,75 @@ class PiholeBlocker:
             }
             
             resp = self.session.post(
-                self._api_url("/domains/deny"),
+                self._api_url("/domains/deny/exact"),
                 json=payload,
                 timeout=self.timeout
             )
 
             # Re-auth if needed
             if resp.status_code in (401, 403):
+                logger.warning("Session expired saat memblokir domain, mencoba re-auth...")
                 if self.authenticate():
                     resp = self.session.post(
-                        self._api_url("/domains/deny"),
+                        self._api_url("/domains/deny/exact"),
                         json=payload,
                         timeout=self.timeout
                     )
 
+            logger.info(f"Response pemblokiran {domain}: HTTP {resp.status_code}")
+
             if resp.status_code in (200, 201):
-                logger.info(f"Domain diblokir: {domain}")
+                logger.info(f"✓ Berhasil memblokir domain: {domain}")
                 return True
             elif resp.status_code == 409:
-                logger.debug(f"Domain sudah ada di deny list: {domain}")
-                return True  # Sudah diblokir = success
+                logger.info(f"✓ Domain sudah ada di deny list (sudah terblokir): {domain}")
+                return True
             else:
-                logger.warning(
-                    f"Gagal blokir {domain}: HTTP {resp.status_code} - {resp.text}"
+                logger.error(
+                    f"✗ Gagal memblokir {domain}: HTTP {resp.status_code} - {resp.text}"
                 )
                 return False
 
         except Exception as e:
-            logger.error(f"Error blocking {domain}: {e}")
+            logger.error(f"✗ Error saat memblokir {domain}: {e}")
             return False
 
     def unblock_domain(self, domain: str) -> bool:
         """Hapus domain dari Pi-hole deny list."""
         if not self._ensure_auth():
+            logger.error(f"Gagal melakukan unblock {domain}: Autentikasi ke Pi-hole gagal")
             return False
 
         try:
             resp = self.session.delete(
-                self._api_url(f"/domains/deny/{domain}"),
+                self._api_url(f"/domains/deny/exact/{domain}"),
                 timeout=self.timeout
             )
 
             if resp.status_code in (401, 403):
+                logger.warning("Session expired saat unblock domain, mencoba re-auth...")
                 if self.authenticate():
                     resp = self.session.delete(
-                        self._api_url(f"/domains/deny/{domain}"),
+                        self._api_url(f"/domains/deny/exact/{domain}"),
                         timeout=self.timeout
                     )
 
+            logger.info(f"Response unblock {domain}: HTTP {resp.status_code}")
+
             if resp.status_code in (200, 204):
-                logger.info(f"Domain di-unblock: {domain}")
+                logger.info(f"✓ Berhasil unblock domain: {domain}")
                 return True
             elif resp.status_code == 404:
-                logger.debug(f"Domain tidak ada di deny list: {domain}")
+                logger.info(f"✓ Domain tidak ada di deny list (memang tidak terblokir): {domain}")
                 return True
             else:
-                logger.warning(
-                    f"Gagal unblock {domain}: HTTP {resp.status_code}"
+                logger.error(
+                    f"✗ Gagal unblock {domain}: HTTP {resp.status_code} - {resp.text}"
                 )
                 return False
 
         except Exception as e:
-            logger.error(f"Error unblocking {domain}: {e}")
+            logger.error(f"✗ Error saat unblock {domain}: {e}")
             return False
 
     def block_domains(self, domains: list[str],

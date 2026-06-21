@@ -45,6 +45,7 @@ services:
       PIHOLE_URL: http://pihole
       DB_PATH: /app/data/judol_history.db
       REPORTS_DIR: /app/reports
+      TZ: "Asia/Jakarta"
     volumes:
       - judol_data:/app/data
       - judol_reports:/app/reports
